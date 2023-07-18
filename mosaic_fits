@@ -1,0 +1,69 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Mon Jun  5 11:01:27 2023
+
+@author: hufford
+"""
+import numpy as np
+import matplotlib.pyplot as plt
+from astropy.io import fits
+from astropy.coordinates import SkyCoord
+from astropy import units as u
+from astropy.wcs import WCS #world coordinate system
+from reproject.mosaicking import find_optimal_celestial_wcs
+from reproject.mosaicking import reproject_and_coadd
+from reproject import reproject_interp
+from reproject import reproject_exact
+from astropy.utils.data import get_pkg_data_filename
+import glob
+
+
+files = glob.glob("/home/hufford/GAL_DATA/I_map/*.fits")
+nuv_files = [i for i in files if '-nd-' in i]
+fuv_files = [i for i in files if '-fd-' in i]
+
+nuv_hduls = [fits.open(i) for i in nuv_files]
+fuv_hduls = [fits.open(i) for i in fuv_files]
+
+wcs_fuv, shape_fuv = find_optimal_celestial_wcs(fuv_hduls[0:3])
+array, footprint = reproject_and_coadd([fuv_hduls[1]], wcs_fuv, shape_out=shape_fuv, reproject_function = reproject_exact)
+
+plt.figure(figsize=(6, 6))
+plt.imshow(array, origin ='lower', vmin=0, vmax=0.006)
+plt.title('FUV reference mosaic')
+plt.colorbar()
+
+# save the image
+hdu = fits.PrimaryHDU(data = array, header = wcs_fuv.to_header())
+#hdul_save = fits.HDUList(hdus = [hdu])
+#hdul_save.writeto("/home/hufford/GAL_DATA/mosiacs/NUV_test.fits", overwrite=True)
+
+
+#plt.figure(figsize = (6,6))
+#plt.imshow(footprint, origin = 'lower')
+
+wcs = WCS(nuv_hduls[1][0].header) #object of header data, for indexing, class object
+
+array2, footprint2 = reproject_exact(hdu, fuv_hduls[1][0].header)
+#np.shape(array)
+#np.shape(array2[0])
+plt.figure(figsize=(6, 6))
+plt.imshow(array2[0], origin ='lower', vmin=0, vmax=0.006)
+plt.title('FUV secondary reproject')
+plt.colorbar()
+
+comparison = (fuv_hduls[1][0].data - array2[0])#/fuv_hduls[1][0].data
+plt.figure(figsize=(6,6))
+plt.imshow(comparison, origin='lower', vmin=0, vmax=0.006)
+plt.title('FUV Comparison')
+plt.colorbar()
+
+plt.figure()
+fits_FUV = get_pkg_data_filename('/home/hufford/GAL_DATA/I_map/NGPDWS_01-fd-int.fits')
+
+fits.info(fits_FUV)
+image_data1 = fits.getdata(fits_FUV)
+#print(image_data1)
+plt.imshow(image_data1, origin='lower', vmin=0,vmax=0.006)
+plt.colorbar()
