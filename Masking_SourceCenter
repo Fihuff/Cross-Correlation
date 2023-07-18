@@ -1,0 +1,146 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Tue Jun 13 14:03:44 2023
+
+@author: hufford
+"""
+
+from astropy.io import fits 
+from astropy.table import Table
+#from astropy.visualization import astropy_mpl_style
+from astropy.utils.data import get_pkg_data_filename
+import matplotlib.pyplot as plt
+import numpy as np
+import numpy.ma as ma 
+from astropy.coordinates import SkyCoord
+from astropy import units as u
+from astropy.wcs import WCS #world coordinate system
+
+def Find_Sources(mcat,FUV_map,NUV_map):
+    #load in the files and the Mcat table
+    merged = fits.open(mcat)
+    merged_data = Table(merged[1].data)
+    
+    FUV = get_pkg_data_filename(FUV_map)
+    NUV = get_pkg_data_filename(NUV_map)
+    f = fits.open(FUV)
+    n = fits.open(NUV)
+    
+    
+    FUV_data = fits.getdata(FUV, ext=0)
+    NUV_data = fits.getdata(NUV, ext=0)
+    W_FUV = WCS(f[0].header)
+    W_NUV = WCS(n[0].header)
+    
+    #find the centers of the object positions
+    FUV_obY = merged_data['FUV_Y_IMAGE']
+    FUV_obX = merged_data['FUV_X_IMAGE']
+    NUV_obY = merged_data['NUV_Y_IMAGE']
+    NUV_obX = merged_data['NUV_X_IMAGE']
+    
+    FUV_objectY = FUV_obY[FUV_obY >= 0]
+    FUV_objectX = FUV_obX[FUV_obX >= 0]
+    NUV_objectY = NUV_obY[NUV_obY >= 0]
+    NUV_objectX = NUV_obX[NUV_obX >= 0]
+    
+    
+    #sky_FUV = W_FUV.pixel_to_world(FUV_objectX, FUV_objectY)
+    #sky_NUV = W_NUV.pixel_to_world(NUV_objectX, NUV_objectY)
+    f.close()
+    n.close()
+    
+    plt.figure(figsize=(6,6))
+    ax = plt.subplot(projection= W_FUV)
+    im = ax.imshow(FUV_data, cmap='gray', vmin=0,vmax=0.006)
+    plt.colorbar(im)
+    plt.scatter(FUV_objectX, FUV_objectY, marker='x', c= "r", label='Object')
+    plt.title('FUV Point Sources')
+    plt.legend(loc='lower right')
+    
+    plt.figure(figsize=(6,6))
+    ax = plt.subplot(projection= W_NUV)
+    im = ax.imshow(NUV_data, cmap='gray', vmin=0,vmax=0.008)
+    plt.colorbar(im)
+    plt.scatter(NUV_objectX, NUV_objectY, marker='x', c= "r", label='Object')
+    plt.title('NUV Point Sources')
+    plt.legend(loc='lower right')
+    
+    return FUV_objectX, NUV_objectY
+
+
+def Range_Median(mcat,FUV_map,NUV_map):
+    #call the data from the respective fits files 
+    merged = fits.open(mcat)
+    merged_data = Table(merged[1].data)
+    
+    FUV_map_data= get_pkg_data_filename(FUV_map)
+    NUV_map_data = get_pkg_data_filename(NUV_map)
+    f = fits.open(FUV_map_data)
+    n = fits.open(NUV_map_data)
+    
+    
+    FUV_data = fits.getdata(FUV_map_data, ext=0)
+    NUV_data = fits.getdata(NUV_map_data, ext=0)
+    W_FUV = WCS(f[0].header)
+    W_NUV = WCS(n[0].header)
+    
+    #Calling the data from FITs file and assinging w/ appropriate column
+    FUV_y_min = merged_data['FUV_YMIN_IMAGE']
+    FUV_x_min = merged_data['FUV_XMIN_IMAGE']
+    FUV_y_max = merged_data['FUV_YMAX_IMAGE']
+    FUV_x_max = merged_data['FUV_XMAX_IMAGE']
+   
+    NUV_y_min = merged_data['NUV_YMIN_IMAGE']
+    NUV_x_min = merged_data['NUV_XMIN_IMAGE']
+    NUV_y_max = merged_data['NUV_YMAX_IMAGE']
+    NUV_x_max = merged_data['NUV_XMAX_IMAGE']
+
+    #Now make a mask to get rid of the negative values in these coords
+    FUV_y_min_mask = FUV_y_min[FUV_y_min >= 0]
+    FUV_y_max_mask = FUV_y_max[FUV_y_max >= 0]
+    FUV_x_min_mask = FUV_x_min[FUV_x_min >= 0]
+    FUV_x_max_mask = FUV_x_max[FUV_x_max >= 0]
+    
+    NUV_y_min_mask = NUV_y_min[NUV_y_min >= 0]
+    NUV_y_max_mask = NUV_y_max[NUV_y_max >= 0]
+    NUV_x_min_mask = NUV_x_min[NUV_x_min >= 0]
+    NUV_x_max_mask = NUV_x_max[NUV_x_max >= 0]
+    
+    #Make a True or False mask iteration for each coord
+    #FUV_mask_array = np.full(FUV_map_data.shape, False)
+    #NUV_mask_array = np.full(NUV_map_data.shape, False)
+    
+    #make an empty list for the new coords to live
+    FUV_list = []
+    plt.figure(figsize=(6,6))
+    ax = plt.subplot(projection= W_FUV)
+    im = ax.imshow(FUV_data, cmap='gray', vmin=0,vmax=0.006)
+    plt.colorbar(im)
+    plt.title('FUV Point Sources-Using Range')
+               
+    for i in range(len(FUV_y_min_mask)):
+        FUV_ymid = (FUV_y_max_mask[i] + FUV_y_min_mask[i])/2 
+        FUV_xmid = (FUV_x_max_mask[i] + FUV_x_min_mask[i])/2
+        FUV_list.append((FUV_xmid, FUV_ymid))
+        plt.plot(FUV_xmid, FUV_ymid, marker='x', c= "r", linestyle="")
+     
+    
+    NUV_list = []
+    plt.figure(figsize=(6,6))
+    ax = plt.subplot(projection= W_NUV)
+    im = ax.imshow(NUV_data, cmap='gray', vmin=0,vmax=0.008)
+    plt.colorbar(im)
+    plt.title('NUV Point Sources-Using Range')
+    
+    for k in range(len(NUV_x_min_mask)):
+        NUV_ymid = (NUV_y_max_mask[k] + NUV_y_min_mask[k])/2 
+        NUV_xmid = (NUV_x_max_mask[k] + NUV_x_min_mask[k])/2
+        NUV_list.append((NUV_xmid, NUV_ymid))
+        plt.plot(NUV_xmid, NUV_ymid, marker='x', c= "r", linestyle='')
+         
+    return(FUV_list,NUV_list) 
+
+#F_list, N_list = Range_Median('/home/hufford/GAL_DATA/merged_cat/NGPDWS_00-xd-mcat.fits', '/home/hufford/GAL_DATA/I_map/NGPDWS_00-fd-int.fits', '/home/hufford/GAL_DATA/I_map/NGPDWS_00-nd-int.fits')
+#FUV_L, NUV_L = Find_Sources('/home/hufford/GAL_DATA/merged_cat/NGPDWS_00-xd-mcat.fits', '/home/hufford/GAL_DATA/I_map/NGPDWS_00-fd-int.fits', '/home/hufford/GAL_DATA/I_map/NGPDWS_00-nd-int.fits')
+
